@@ -6,6 +6,9 @@
 
 #include "net.h"
 #include "http.h"
+#include "ds/hashtable.h"
+#include "tools/path_parser.h"
+#include "ds/tree_for_parsing.h"
 
 #define METHOD_SIZE 16
 #define PATH_SIZE 2048
@@ -15,13 +18,17 @@ typedef struct HTTP {
     char *host;
     int32_t len;
     int32_t cap;
+    tree_t *tree;
     void (**funcs)(int, HTTPreq*);
-//    HashTab
+    HashTable *tab;
 } HTTP;
 
 static void _null_request(HTTPreq *request);
 static HTTPreq _new_request(void );
 static void _parse_request(HTTPreq *request, char *buffer, size_t size);
+static void _page404_http(int con);
+static int8_t _switch_http(HTTP *http, int con, HTTPreq *request);
+
 
 extern HTTP *new_http(char *address) {
     HTTP *http = (HTTP*) malloc(sizeof(HTTP));
@@ -29,27 +36,45 @@ extern HTTP *new_http(char *address) {
     http->len = 0;
     http->host = (char*) malloc(sizeof(char ) * strlen(address) + 1);
     strcpy(http->host, address);
+    http->tab = new_hashtab(http->cap, DECIMAL_ELEM);
     http->funcs = (void (**)(int, HTTPreq*)) malloc(http->cap * (sizeof(void (*)(int, HTTPreq*))));
+    http->tree = init_tree("/", NULL);
     return http;
 }
 
 extern void free_http(HTTP *http) {
+    free_hashtab(http->tab);
+    tree_f(http->tree);
     free(http->host);
     free(http->funcs);
     free(http);
 }
 
 extern void handle_http(HTTP *http, char *path, void (*handle)(int, HTTPreq*)) {
-
+//    set_hashtab(http->tab, string(path), decimal(http->len));
+//    http->funcs[http->len] = handle;
+//    http->len += 1;
+//    if (http->len == http->cap) {
+//        http->cap <<= 1;
+//        http->funcs = (void(**)(int, HTTPreq*)) realloc(http->funcs, http->cap * sizeof(void(*)(int, HTTPreq*)));
+//    }
+    if (strcmp(path, "/") == 0) {
+        set_func(http->tree, handle);
+        return;
+    }
+    else {
+        add_path(http->tree, path, handle);
+    }
 }
 
 extern int8_t listen_http(HTTP *http) {
-    int listener = listen_http(http->host);
+    int listener = listen_net(http->host);
     if (listener < 0) {
         return 1;
     }
     while (1) {
         int conn = accept_net(listener);
+        printf("> Client accept...\n");
         if (conn < 0) {
             continue;
         }
@@ -65,8 +90,9 @@ extern int8_t listen_http(HTTP *http) {
                 break;
             }
         }
-//        _switch_http(http, conn, &req);
+        _switch_http(http, conn, &req);
         close_net(conn);
+        printf("> Answer was sent...\n");
     }
     close_net(listener);
     return 0;
@@ -97,6 +123,7 @@ static HTTPreq _new_request(void ) {
 }
 
 static void _parse_request(HTTPreq *request, char *buffer, size_t size) {
+    printf("%s\n", buffer);
     for (size_t i = 0; i < size; i++) {
         switch (request->state) {
             case 0:
@@ -126,10 +153,27 @@ static void _parse_request(HTTPreq *request, char *buffer, size_t size) {
             default:
                 return;
         }
+        request->index += 1;
     }
 }
 
 static void _null_request(HTTPreq *request) {
     request->state += 1;
     request->index = 0;
+}
+
+static int8_t _switch_http(HTTP *http, int con, HTTPreq *request) {
+    if (exc_path(http->tree, con, request) == 0) {
+        _page404_http(con);
+    }
+    else {
+        return 1;
+    }
+}
+
+static void _page404_http(int con) {
+    printf("> Page not found\n");
+    char *header = "HTTP/1.1 404 Not Found\nContent-type: text/html\n\n<h2>Not Found<h2>";
+    size_t headsize = strlen(header);
+    send_net(con, header, headsize);
 }

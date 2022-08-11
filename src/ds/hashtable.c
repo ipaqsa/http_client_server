@@ -44,8 +44,7 @@ extern void free_hashtab(HashTable *hashTable) {
 
 extern value_tree_t get_hashtab(HashTable *hashTable, void *key) {
     uint32_t hash = _strhash(key, hashTable->size);
-    value_tree_t result;
-    get_tree(hashTable->table[hash], key);
+    value_tree_t result = get_tree(hashTable->table[hash], key);
     return result;
 }
 

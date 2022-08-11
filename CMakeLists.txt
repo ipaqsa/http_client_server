@@ -3,4 +3,4 @@ project(HTTP C)
 
 set(CMAKE_C_STANDARD 17)
 
-add_executable(HTTP main.c src/server.c src/server.h src/client.c src/client.h src/net.c src/net.h src/http.c src/http.h src/ds/hashtable.c src/ds/hashtable.h src/ds/tree.c src/ds/tree.h)
+add_executable(HTTP main.c src/server.c src/server.h src/client.c src/client.h src/net.c src/net.h src/http.c src/http.h src/ds/hashtable.c src/ds/hashtable.h src/ds/tree.c src/ds/tree.h src/tools/path_parser.c src/tools/path_parser.h src/ds/tree_for_parsing.c src/ds/tree_for_parsing.h)
